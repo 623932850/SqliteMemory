@@ -12,7 +12,7 @@ extern "C" {
  * Method:    test
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_com_autel_sqlitememory_MainActivity_test
+JNIEXPORT jobject JNICALL Java_com_autel_sqlitememory_MainActivity_test
   (JNIEnv *, jclass);
 
 #ifdef __cplusplus

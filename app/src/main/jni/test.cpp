@@ -6,31 +6,86 @@
 #include <jni.h>
 #include <stdio.h>
 #include <sqlite3.h>
+#include <android/log.h>
+#include <string.h>
 /* Header for class com_autel_sqlitememory_MainActivity */
+
+#define LOG_TAG "TestLib"
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+
 
 #ifndef _Included_com_autel_sqlitememory_MainActivity
 #define _Included_com_autel_sqlitememory_MainActivity
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+int _sql_callback(void *notused, int argc, char **argv, char **szColName);
+static JNIEnv * globalJniEnv;
+static jobject jObjList;
+
 /*
  * Class:     com_autel_sqlitememory_MainActivity
  * Method:    test
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_com_autel_sqlitememory_MainActivity_test
-        (JNIEnv *, jclass){
+JNIEXPORT jobject JNICALL Java_com_autel_sqlitememory_MainActivity_test
+        (JNIEnv * jniEnv, jclass jObj){
+    LOGD("enter Java_com_autel_sqlitememory_MainActivity_test");
+    //char * filename = ":memory:";
+
+    globalJniEnv = jniEnv;
+
+    char * filename = "/sdcard/Scan/Vehicle/USA/Test/test.db";
     sqlite3 * db;
-    int ret = sqlite3_open(":memory", &db);
+    int ret = sqlite3_open(filename, &db);
 
     if(ret != SQLITE_OK){
-        printf("open error");
-        return;
+        LOGD("sqlite3_open error=>code=%d", ret);
+        return NULL;
+    }
+    LOGD("sqlite3_open success");
+    char * sql = "select p1 from tbl_menu_data group by p1";
+    char *pErrMsg = NULL;
+
+
+
+    jclass jClassList = jniEnv->FindClass("java/util/ArrayList");
+    jmethodID constructor = jniEnv->GetMethodID(jClassList, "<init>", "()V");
+    jObjList = jniEnv->NewObject(jClassList, constructor);
+
+    int a = 100;
+    ret = sqlite3_exec(db, sql, _sql_callback, &jObjList, &pErrMsg);
+    if(ret != SQLITE_OK){
+        LOGD("sqlite3_exec error");
+        sqlite3_free(pErrMsg);
+        sqlite3_close(db);
+        return NULL;
     }
 
-    printf("open db ok");
 
-    const char * sql = "";
+    sqlite3_close(db);
+
+    return jObjList;
+}
+
+int _sql_callback(void *notused, int argc, char **argv, char **szColName){
+
+    LOGD("column argc=%d, notused=0x%x", argc, (jobject *)notused);
+    jclass jclassString = globalJniEnv->FindClass("java/lang/String");
+    jmethodID constructor = globalJniEnv->GetMethodID(jclassString, "<init>", "([BLjava/lang/String;)V");
+    for(int i=0; i<argc; i++){
+        const char * c = argv[i];
+        LOGD("p1=%s", c);
+        jsize len = strlen(c);
+        jbyteArray bytes = globalJniEnv->NewByteArray(len);
+        globalJniEnv->SetByteArrayRegion(bytes, 0, len, (jbyte *)c);
+        jstring encoding = globalJniEnv->NewStringUTF("UTF-8");
+        jobject jobjString = globalJniEnv->NewObject(jclassString, constructor, bytes, encoding);
+        jclass jClassList = globalJniEnv->FindClass("java/util/ArrayList");
+        globalJniEnv->CallBooleanMethod(jObjList, globalJniEnv->GetMethodID(jClassList, "add", "(Ljava/lang/Object;)Z"), jobjString);
+    }
+    return 0;
 }
 
 #ifdef __cplusplus
